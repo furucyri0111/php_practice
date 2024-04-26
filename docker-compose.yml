@@ -1,38 +1,48 @@
 version: '3.7'
 services:
-  mysql:
-    image: mysql:8.0
+  nginx:
+    image: nginx
     restart: unless-stopped
-    networks:
-    - wp_net
-    volumes:
-    - mysql_volume:/var/lib/mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: wordpress
-      MYSQL_USER: wordpress
-      MYSQL_PASSWORD: password
-
-  wordpress:
-    image: wordpress:php8.3-apache
-    restart: unless-stopped
-    depends_on:
-    - mysql
-    networks:
-    - wp_net
     ports:
     - 8080:80
-    platform: 'linux/amd64'
+    volumes:
+      # ./srcフォルダをコンテナ内の/var/www/htmlにマウント
+      - ./src:/var/www/html
+      # ./docker/nginxフォルダをコンテナ内の/etc/nginx/conf.dにマウント
+      - ./docker/nginx:/etc/nginx/conf.d
+    # 依存関係を設定
+    depends_on:
+      - app
+  # PHP-FPMの定義
+  app:
+    build:
+      # Dockerfileを格納するフォルダのパス
+      context: ./docker/php
+      # Dockerfileのファイル名
+      dockerfile: Dockerfile
+    volumes:
+      # ./srcフォルダをコンテナ内の/var/www/htmlにマウント
+     - ./src:/var/www/html
+     # 依存関係を設定
+    depends_on:
+      - mysql
+  # MySQLの定義
+  mysql:
+    # MySQL コンテナに使用するイメージを指定
+    image: mysql:8.0
+    # コンテナ内で使用される環境変数を定義
     environment:
-      WORDPRESS_DB_HOST: mysql:3306
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DB_USER: wordpress
-      WORDPRESS_DB_PASSWORD: password
-
-networks:
-  wp_net:
-    driver: bridge
-
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      # 名前付きボリュームを MySQL コンテナに紐づける
+      - mysqldata:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      # - ./docker/mysql/sql:/docker-entrypoint-initdb.d
+    ports:
+      - 3306:3306
 volumes:
-  mysql_volume:
-    driver: local
+  # 名前付きボリュームの作成
+  mysqldata:
